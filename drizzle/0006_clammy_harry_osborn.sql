@@ -1,0 +1,1 @@
+ALTER TABLE "bots" ALTER COLUMN "bot_discord_id" SET DATA TYPE varchar(200);

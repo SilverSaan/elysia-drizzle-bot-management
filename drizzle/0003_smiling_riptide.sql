@@ -1,0 +1,1 @@
+ALTER TABLE "commands" ADD COLUMN "bot_id" integer;

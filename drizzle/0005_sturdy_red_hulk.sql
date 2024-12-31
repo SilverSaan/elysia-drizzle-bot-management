@@ -1,0 +1,1 @@
+ALTER TABLE "bots" ADD COLUMN "name" varchar(50) DEFAULT '' NOT NULL;

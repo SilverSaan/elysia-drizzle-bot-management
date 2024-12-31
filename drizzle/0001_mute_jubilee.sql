@@ -1,0 +1,1 @@
+ALTER TABLE "bots" ADD CONSTRAINT "bots_auth_key_unique" UNIQUE("auth_key");
