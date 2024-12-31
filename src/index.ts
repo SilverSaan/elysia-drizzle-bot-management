@@ -15,7 +15,9 @@ import { startBotStatusUpdate } from './services/botStatusService'; // Import th
 
 const app = new Elysia()
   .use(cors())
-  .use(swagger())
+  .use(swagger({
+    scalarVersion: '1.25.74'
+  }))
 
   .use(note)
   .use(botController)

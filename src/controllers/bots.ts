@@ -172,7 +172,6 @@ export const botController = new Elysia()
         }),
       }
     )
-
     // Endpoint to delete a bot by ID
     .delete(
       '/bots/:id',
@@ -188,4 +187,88 @@ export const botController = new Elysia()
           id: t.String(), // Validate ID from the route
         }),
       }
-    );
+    )
+    .post(
+      '/bots/:id/jsons', 
+      async ({ body, params }) => {
+        
+        const bot = await db
+          .select()
+          .from(bots)
+          .where(eq(bots.id, Number(params.id))) // Find bot by ID
+          .limit(1); // Ensure we only get one result
+        
+        // If no bot is found, return a 404 response
+        if (bot.length === 0) {
+          throw new NotFoundError()
+        }
+
+        const file = body.file;
+
+        // Check if the file is a valid JSON file
+        
+  
+        // If it doesn't exist create a folder in storage with the bot id
+        const fs = require('fs');
+        const path = require('path');
+
+
+        if (!file.name.endsWith('.json')) {
+          throw new Error('Invalid file type. Please upload a JSON file.');
+        }
+        //Check contents to ensure it is a valid JSON file
+        let json = null;
+        try {
+          const fileContent = await file.text();
+          json = JSON.parse(fileContent);
+        } catch (error) {
+          throw new Error('Invalid JSON file. Please upload a valid JSON file.');
+        }
+
+        const botId = params.id;
+        const botFolder = path.join(__dirname, '..', 'storage', botId);
+
+        if (!fs.existsSync(botFolder)) {
+          fs.mkdirSync(botFolder, { recursive: true });
+        }
+
+        const jsonFilePath = path.join(botFolder, body.file.name);
+        await Bun.write(jsonFilePath, file);
+
+        return { message: 'JSON file saved successfully', path: jsonFilePath };
+        },
+        {
+          params: t.Object({
+            id: t.String(), // Validate ID from the route
+          }),
+          body: t.Object({
+            file: t.File(),
+          }), 
+        }
+      )
+    .get('/bots/:id/jsons', ({ params }) => {
+      const fs = require('fs');
+      const path = require('path');
+
+      const botId = params.id;
+      const botFolder = path.join(__dirname, '..', 'storage', botId);
+
+      if (!fs.existsSync(botFolder)) {
+        throw new NotFoundError('No JSON files found for the bot');
+      }
+
+      //Return Key Value pairs where key is the file name and value is the file content
+      return fs.readdirSync(botFolder).map((file: string) => {
+        const filePath = path.join(botFolder, file);
+        let json = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        return {
+          [file]: json
+        };
+      });
+
+    },{
+      params: t.Object({
+        id: t.String(), // Validate ID from the route
+      }), 
+    });
+
