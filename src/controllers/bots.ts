@@ -3,6 +3,9 @@ import { db } from '../db/connection'; // Import the database connection
 import { bots } from '../db/schema/bots'; // Import your bot table schema
 import { eq } from 'drizzle-orm'; // Import helper for conditional queries
 import { ConflictError } from '../errors/exceptions';
+import { websocket } from 'elysia/dist/ws';
+
+const botClients = new Map(); // Store bot clients in memory
 
 export const botController = new Elysia()
     .error({
@@ -28,6 +31,20 @@ export const botController = new Elysia()
           bot_status: t.Enum({ online: 'online', offline: 'offline' }), // Validate the 'bot_status' field (should be a string like "online", "offline", etc.)
           name: t.String()        // Validate the 'name' field (bot name)
       }),
+      open(ws) {
+        const { auth_key } = ws.data.query;
+        if (auth_key) {
+            botClients.set(auth_key, ws);
+            console.log(`Bot ${auth_key} connected.`);
+        }
+      },
+      close(ws) {
+        const { auth_key } = ws.data.query;
+        if (auth_key) {
+            botClients.delete(auth_key);
+            console.log(`Bot ${auth_key} disconnected.`);
+        }
+      },
       // Handle incoming messages
       message(ws, { auth_key, bot_status, name }) {
           const { id } = ws.data.query;
@@ -45,7 +62,7 @@ export const botController = new Elysia()
             })
             .where(eq(bots.authKey, auth_key)) // Match the bot by auth_key
             .returning()
-            .then(updatedBot => {
+            .then(_updatedBot => {
                 console.log(`Updated status for bot: ${name} (${auth_key}) - Status: ${bot_status}`);
                 ws.send({
                     id,
@@ -59,6 +76,22 @@ export const botController = new Elysia()
                 console.error(err);
             });
       }
+    })
+    .delete('/shutdown/:auth_key', ({ params }) => {
+        const ws = botClients.get(params.auth_key);
+
+        if (!ws) {
+            return { error: 'Bot not found or not connected' };
+        }
+
+        ws.send({ shutdown: params.auth_key }); // Send shutdown command
+        console.log(`Shutdown command sent to bot ${params.auth_key}`);
+        
+        return { success: true, message: `Shutdown command sent to bot ${params.auth_key}` };
+    }, {
+        params: t.Object({
+            auth_key: t.String(), // Validate ID from the route
+        }),
     })
     .get('/bots', async () => {
       const allBots = await db.select().from(bots);
